@@ -231,7 +231,7 @@ const App = () => {
   const [videoStream, setVideoStream] = useState(null);
   
   // !!! 請填入您的 Gemini API Key !!!
-  // 範例: const apiKey = "AIzaSyDaBcDeFgHiJkLmNoPqRsTuVwXyZ";
+  // 已自動填入您提供的 Key
   const apiKey = "AIzaSyCDDMlPs4rs8Yviya6PsXkV6OcBu8K4QC4"; 
   
   const fileInputRef = useRef(null);
@@ -438,6 +438,12 @@ const App = () => {
       });
       const data = await response.json();
       
+      // *** 增強的錯誤處理 ***
+      if (data.error) {
+         console.error("Google API Error:", data.error);
+         throw new Error(`API Error: ${data.error.message}`);
+      }
+
       if (!data.candidates || !data.candidates[0].content) {
          console.error("API Error Data:", data);
          throw new Error("AI 生成失敗，請檢查 API Key 或網路");
@@ -446,9 +452,9 @@ const App = () => {
       const rawUrl = `data:image/png;base64,${data.candidates[0].content.parts.find(p => p.inlineData).inlineData.data}`;
       return await mergeTextToImage(rawUrl, meme.text);
     } catch (e) {
-      console.error(e);
-      if (retry < 1) return callAI(meme, retry + 1); // 減少重試次數，避免卡住
-      return null;
+      console.error("Call AI Error:", e);
+      // 回傳錯誤訊息物件，讓前端可以顯示
+      return { error: e.message || "Unknown Error" }; 
     }
   };
 
@@ -482,15 +488,16 @@ const App = () => {
 
     for (let i = 0; i < selectedMemes.length; i++) {
       setStatus(`繪製中 (${i+1}/9): ${selectedMemes[i].text}`);
-      const finalUrl = await callAI(selectedMemes[i]);
+      const result = await callAI(selectedMemes[i]);
       
       setStickers(prev => {
         const next = [...prev];
-        if (finalUrl) {
-            next[i] = { ...next[i], loading: false, url: finalUrl };
+        if (result && !result.error && typeof result === 'string') {
+            next[i] = { ...next[i], loading: false, url: result };
         } else {
-            // 如果失敗，顯示錯誤狀態
-            next[i] = { ...next[i], loading: false, error: true };
+            // 如果失敗，顯示詳細錯誤訊息
+            const errorMsg = result?.error || "生成失敗";
+            next[i] = { ...next[i], loading: false, error: true, errorMsg: errorMsg };
         }
         return next;
       });
@@ -744,9 +751,12 @@ const App = () => {
                     <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Generating</span>
                   </div>
                 ) : s.error ? (
-                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-2">
+                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-2 p-2 text-center">
                       <AlertCircle size={24} className="text-red-500" />
-                      <span className="text-[10px] text-red-400">失敗</span>
+                      <span className="text-[10px] text-red-400 font-bold">生成失敗</span>
+                      <span className="text-[8px] text-red-500/70 leading-tight overflow-hidden text-ellipsis w-full">
+                        {s.errorMsg || "請檢查 API Key"}
+                      </span>
                    </div>
                 ) : s.url ? (
                   <div className="relative h-full w-full animate-in zoom-in duration-400 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
