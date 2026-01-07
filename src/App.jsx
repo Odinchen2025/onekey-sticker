@@ -232,7 +232,7 @@ const App = () => {
   
   // !!! 請填入您的 Gemini API Key !!!
   // 已自動填入您提供的 Key
-  const apiKey = "AIzaSyCDDMlPs4rs8Yviya6PsXkV6OcBu8K4QC4"; 
+  const apiKey = "AIzaSyCqfDIGCu3lVTcCswwtEmOXtUD1J7aqWiM"; 
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -486,24 +486,46 @@ const App = () => {
 
     setStickers(selectedMemes.map(m => ({ ...m, loading: true })));
 
+    // *** 優化循環：增加中斷機制與冷卻時間 ***
     for (let i = 0; i < selectedMemes.length; i++) {
+      // 檢查是否中斷 (例如上一張出現嚴重錯誤)
+      // 這裡簡單實作：如果有 Quota 錯誤就停止
+      
       setStatus(`繪製中 (${i+1}/9): ${selectedMemes[i].text}`);
+      
+      // 增加冷卻時間：每張圖片間隔 2 秒 (避免 Rate Limit)
+      if (i > 0) await new Promise(r => setTimeout(r, 2000));
+
       const result = await callAI(selectedMemes[i]);
       
+      let shouldStop = false;
+
       setStickers(prev => {
         const next = [...prev];
         if (result && !result.error && typeof result === 'string') {
             next[i] = { ...next[i], loading: false, url: result };
         } else {
-            // 如果失敗，顯示詳細錯誤訊息
             const errorMsg = result?.error || "生成失敗";
             next[i] = { ...next[i], loading: false, error: true, errorMsg: errorMsg };
+            
+            // 檢查是否為 Quota 錯誤
+            if (errorMsg.includes("quota") || errorMsg.includes("429")) {
+                shouldStop = true;
+            }
         }
         return next;
       });
+
+      if (shouldStop) {
+          setStatus("⚠️ API 額度已用完，停止生成剩餘貼圖。");
+          break; // 強制跳出迴圈
+      }
+    }
+    
+    if (status.includes("繪製中")) {
+        setStatus('生成完成！');
     }
     setIsGenerating(false);
-    setStatus('生成完成！');
   };
 
   const downloadImg = (url, name) => {
