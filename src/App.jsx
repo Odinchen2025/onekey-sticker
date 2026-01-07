@@ -19,14 +19,10 @@ import {
 } from "firebase/auth";
 
 // --- 初始化 Firebase ---
-// 請在此填入您的 Firebase 設定 (若無則跳過，僅影響登入功能)
 const firebaseConfig = {
-  // apiKey: "您的-api-key",
-  // authDomain: "您的-project-id.firebaseapp.com",
-  // projectId: "您的-project-id",
-  // storageBucket: "您的-project-id.appspot.com",
-  // messagingSenderId: "...",
-  // appId: "..."
+  // apiKey: "您的-firebase-api-key",
+  // authDomain: "...",
+  // ... (如果沒有 Firebase，保留這裡為空即可，只會影響登入功能)
 };
 
 // 初始化 App (容錯處理)
@@ -234,7 +230,8 @@ const App = () => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [videoStream, setVideoStream] = useState(null);
   
-  // !!! 請填入您的 API Key !!!
+  // !!! 請填入您的 Gemini API Key !!!
+  // 範例: const apiKey = "AIzaSyDaBcDeFgHiJkLmNoPqRsTuVwXyZ";
   const apiKey = "AIzaSyCDDMlPs4rs8Yviya6PsXkV6OcBu8K4QC4"; 
   
   const fileInputRef = useRef(null);
@@ -243,16 +240,13 @@ const App = () => {
 
   // --- Auth Effect ---
   useEffect(() => {
-    // 如果沒有 auth 實例 (例如本地沒填 config)，就直接跳過
     if (!auth) return;
 
     const initAuth = async () => {
-      // 檢查是否在 Canvas 環境或是本地有 config
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         await signInWithCustomToken(auth, __initial_auth_token);
       } else {
-        // 本地端預設使用匿名登入
-        await signInAnonymously(auth).catch(err => console.log("匿名登入失敗 (可能未開啟 Auth):", err));
+        await signInAnonymously(auth).catch(err => console.log("匿名登入失敗:", err));
       }
     };
     initAuth();
@@ -413,6 +407,11 @@ const App = () => {
 
   // --- AI Generation ---
   const callAI = async (meme, retry = 0) => {
+    if (!apiKey) {
+      alert("請先設定 API Key 才能生成貼圖！");
+      throw new Error("No API Key");
+    }
+
     try {
       const actionPrompt = meme.isCustom
         ? `Make a funny, exaggerated facial expression that matches the emotion of saying "${meme.text}".` 
@@ -440,18 +439,25 @@ const App = () => {
       const data = await response.json();
       
       if (!data.candidates || !data.candidates[0].content) {
-         throw new Error("API Error");
+         console.error("API Error Data:", data);
+         throw new Error("AI 生成失敗，請檢查 API Key 或網路");
       }
 
       const rawUrl = `data:image/png;base64,${data.candidates[0].content.parts.find(p => p.inlineData).inlineData.data}`;
       return await mergeTextToImage(rawUrl, meme.text);
     } catch (e) {
-      if (retry < 2) return callAI(meme, retry + 1);
+      console.error(e);
+      if (retry < 1) return callAI(meme, retry + 1); // 減少重試次數，避免卡住
       return null;
     }
   };
 
   const startGeneration = async () => {
+    if (!apiKey) {
+        alert("尚未設定 API Key，無法生成圖片。\n請在程式碼 src/App.jsx 中填入您的 Google Gemini API Key。");
+        return;
+    }
+
     setIsGenerating(true);
     setStep(3);
     
@@ -477,9 +483,15 @@ const App = () => {
     for (let i = 0; i < selectedMemes.length; i++) {
       setStatus(`繪製中 (${i+1}/9): ${selectedMemes[i].text}`);
       const finalUrl = await callAI(selectedMemes[i]);
+      
       setStickers(prev => {
         const next = [...prev];
-        next[i] = { ...next[i], loading: false, url: finalUrl };
+        if (finalUrl) {
+            next[i] = { ...next[i], loading: false, url: finalUrl };
+        } else {
+            // 如果失敗，顯示錯誤狀態
+            next[i] = { ...next[i], loading: false, error: true };
+        }
         return next;
       });
     }
@@ -731,6 +743,11 @@ const App = () => {
                     <RefreshCw size={24} className="animate-spin text-indigo-500" />
                     <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Generating</span>
                   </div>
+                ) : s.error ? (
+                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 gap-2">
+                      <AlertCircle size={24} className="text-red-500" />
+                      <span className="text-[10px] text-red-400">失敗</span>
+                   </div>
                 ) : s.url ? (
                   <div className="relative h-full w-full animate-in zoom-in duration-400 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
                      <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:8px_8px]"></div>
@@ -744,9 +761,7 @@ const App = () => {
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900"><AlertCircle size={20} className="text-red-500/30" /></div>
-                )}
+                ) : null}
               </div>
             ))}
           </div>
