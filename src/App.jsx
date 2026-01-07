@@ -3,7 +3,7 @@ import {
   Upload, Sparkles, Download, RefreshCw, ChevronLeft, 
   Check, Save, AlertCircle, Type, Eraser, Grid, Wand2,
   Briefcase, GraduationCap, MessageCircle, UserCheck, Heart,
-  Camera, LogIn, LogOut, X, User as UserIcon
+  Camera, LogIn, LogOut, X, User as UserIcon, Settings, Key
 } from 'lucide-react';
 
 // --- Firebase Imports ---
@@ -20,9 +20,7 @@ import {
 
 // --- 初始化 Firebase ---
 const firebaseConfig = {
-  // apiKey: "您的-firebase-api-key",
-  // authDomain: "...",
-  // ... (如果沒有 Firebase，保留這裡為空即可，只會影響登入功能)
+  // 如果您有 Firebase Config，請填在這裡，否則保留空白即可
 };
 
 // 初始化 App (容錯處理)
@@ -223,20 +221,25 @@ const App = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [customTexts, setCustomTexts] = useState(Array(9).fill(''));
   
-  // Auth State
+  // Auth & Settings State
   const [user, setUser] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  // API Key State (優先讀取 localStorage，如果沒有則為空)
+  const [userApiKey, setUserApiKey] = useState(() => localStorage.getItem('gemini_api_key') || "");
 
   // Camera State
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [videoStream, setVideoStream] = useState(null);
   
-  // !!! 請填入您的 Gemini API Key !!!
-  // 已自動填入您提供的 Key
-  const apiKey = "AIzaSyCqfDIGCu3lVTcCswwtEmOXtUD1J7aqWiM"; 
-  
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // --- Effect: Save API Key to LocalStorage ---
+  useEffect(() => {
+    localStorage.setItem('gemini_api_key', userApiKey);
+  }, [userApiKey]);
 
   // --- Auth Effect ---
   useEffect(() => {
@@ -407,9 +410,13 @@ const App = () => {
 
   // --- AI Generation ---
   const callAI = async (meme, retry = 0) => {
-    if (!apiKey) {
-      alert("請先設定 API Key 才能生成貼圖！");
-      throw new Error("No API Key");
+    // 優先使用使用者輸入的 Key
+    const keyToUse = userApiKey;
+
+    if (!keyToUse) {
+      // 如果沒有 Key，打開設定面板並中斷
+      setShowSettings(true);
+      throw new Error("請先點擊右上角設定您的 API Key");
     }
 
     try {
@@ -417,7 +424,7 @@ const App = () => {
         ? `Make a funny, exaggerated facial expression that matches the emotion of saying "${meme.text}".` 
         : meme.mood;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${keyToUse}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -441,7 +448,11 @@ const App = () => {
       // *** 增強的錯誤處理 ***
       if (data.error) {
          console.error("Google API Error:", data.error);
-         throw new Error(`API Error: ${data.error.message}`);
+         // 如果是 Key 相關錯誤，打開設定面板
+         if (data.error.message.includes("API key") || data.error.code === 400 || data.error.code === 403) {
+             setShowSettings(true);
+         }
+         throw new Error(data.error.message);
       }
 
       if (!data.candidates || !data.candidates[0].content) {
@@ -453,14 +464,14 @@ const App = () => {
       return await mergeTextToImage(rawUrl, meme.text);
     } catch (e) {
       console.error("Call AI Error:", e);
-      // 回傳錯誤訊息物件，讓前端可以顯示
       return { error: e.message || "Unknown Error" }; 
     }
   };
 
   const startGeneration = async () => {
-    if (!apiKey) {
-        alert("尚未設定 API Key，無法生成圖片。\n請在程式碼 src/App.jsx 中填入您的 Google Gemini API Key。");
+    if (!userApiKey) {
+        setShowSettings(true);
+        alert("請先設定 API Key 才能開始生成！");
         return;
     }
 
@@ -486,14 +497,10 @@ const App = () => {
 
     setStickers(selectedMemes.map(m => ({ ...m, loading: true })));
 
-    // *** 優化循環：增加中斷機制與冷卻時間 ***
     for (let i = 0; i < selectedMemes.length; i++) {
-      // 檢查是否中斷 (例如上一張出現嚴重錯誤)
-      // 這裡簡單實作：如果有 Quota 錯誤就停止
-      
       setStatus(`繪製中 (${i+1}/9): ${selectedMemes[i].text}`);
       
-      // 增加冷卻時間：每張圖片間隔 2 秒 (避免 Rate Limit)
+      // 冷卻時間：2秒
       if (i > 0) await new Promise(r => setTimeout(r, 2000));
 
       const result = await callAI(selectedMemes[i]);
@@ -508,8 +515,7 @@ const App = () => {
             const errorMsg = result?.error || "生成失敗";
             next[i] = { ...next[i], loading: false, error: true, errorMsg: errorMsg };
             
-            // 檢查是否為 Quota 錯誤
-            if (errorMsg.includes("quota") || errorMsg.includes("429")) {
+            if (errorMsg.includes("quota") || errorMsg.includes("429") || errorMsg.includes("expired")) {
                 shouldStop = true;
             }
         }
@@ -517,8 +523,9 @@ const App = () => {
       });
 
       if (shouldStop) {
-          setStatus("⚠️ API 額度已用完，停止生成剩餘貼圖。");
-          break; // 強制跳出迴圈
+          setStatus("⚠️ API 問題 (額度/過期)，請檢查設定。");
+          setShowSettings(true);
+          break;
       }
     }
     
@@ -582,8 +589,16 @@ const App = () => {
           </h1>
         </div>
         
-        {/* User Profile / Login */}
         <div className="flex items-center gap-3">
+          {/* Settings Button (Always Visible) */}
+          <button 
+            onClick={() => setShowSettings(true)} 
+            className={`p-2 rounded-full transition-all ${!userApiKey ? 'bg-red-500/20 text-red-400 animate-pulse border border-red-500/50' : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'}`}
+            title="設定 API Key"
+          >
+            <Settings size={18} />
+          </button>
+
           {user && !user.isAnonymous ? (
             <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
               <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} alt="Avatar" className="w-6 h-6 rounded-full" />
@@ -593,17 +608,61 @@ const App = () => {
             </div>
           ) : (
             <button onClick={handleGoogleLogin} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-full transition-all">
-              <LogIn size={14} /> 登入
+              <LogIn size={14} /> <span className="hidden sm:inline">登入</span>
             </button>
           )}
           
           {step === 3 && !isGenerating && (
             <button onClick={downloadAll} className="hidden sm:flex bg-white text-black px-4 py-1.5 rounded-full text-xs font-black shadow-lg active:scale-95 transition-all hover:bg-indigo-50 items-center gap-1">
-              <Download size={14}/> 儲存全部
+              <Download size={14}/> 儲存
             </button>
           )}
         </div>
       </header>
+
+      {/* Settings Modal (API Key Input) */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-5 animate-in fade-in duration-200">
+           <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl p-6 shadow-2xl relative">
+              <button onClick={() => setShowSettings(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white">
+                <X size={20} />
+              </button>
+              
+              <div className="flex flex-col gap-4">
+                 <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400">
+                       <Key size={20} />
+                    </div>
+                    <div>
+                       <h2 className="text-lg font-bold text-white">設定 API Key</h2>
+                       <p className="text-xs text-slate-400">請輸入您的 Google Gemini API 金鑰</p>
+                    </div>
+                 </div>
+                 
+                 <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">API Key</label>
+                    <input 
+                      type="text" 
+                      value={userApiKey}
+                      onChange={(e) => setUserApiKey(e.target.value)}
+                      placeholder="AIzaSy..."
+                      className="w-full bg-black/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500 transition-all"
+                    />
+                    <p className="text-[10px] text-slate-500">
+                       沒有 Key？ <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">點此免費申請</a>
+                    </p>
+                 </div>
+
+                 <button 
+                   onClick={() => setShowSettings(false)}
+                   className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition-all active:scale-95"
+                 >
+                   儲存設定
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
 
       <main className="flex-1 p-5 overflow-y-auto w-full max-w-2xl mx-auto">
         {status && (
