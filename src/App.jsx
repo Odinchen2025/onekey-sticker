@@ -19,7 +19,7 @@ import {
 } from "firebase/auth";
 
 // --- 初始化 Firebase ---
-// 請在此填入您的 Firebase 設定 (從 Firebase Console > Project Settings > General > Your apps 取得)
+// 請在此填入您的 Firebase 設定 (若無則跳過，僅影響登入功能)
 const firebaseConfig = {
   // apiKey: "您的-api-key",
   // authDomain: "您的-project-id.firebaseapp.com",
@@ -29,11 +29,10 @@ const firebaseConfig = {
   // appId: "..."
 };
 
-// 初始化 App (容錯處理：如果沒填 config 就不初始化，避免報錯)
+// 初始化 App (容錯處理)
 let app;
 let auth;
 try {
-  // 檢查是否在 Canvas 環境或是本地有 config
   const configToUse = Object.keys(firebaseConfig).length > 0 
     ? firebaseConfig 
     : (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
@@ -43,7 +42,7 @@ try {
     auth = getAuth(app);
   }
 } catch (e) {
-  console.warn("Firebase 初始化失敗 (可能是尚未填寫 Config):", e);
+  console.warn("Firebase 初始化跳過");
 }
 
 // --- 資料庫分類定義 ---
@@ -57,7 +56,6 @@ const CATEGORIES = {
 
 // --- 150+ 組分類語庫 ---
 const MEME_DATABASE = [
-  // 1. 社畜
   { category: 'work', text: "收到", mood: "敬禮，表情嚴肅認真" },
   { category: 'work', text: "辛苦了", mood: "遞出毛巾或飲料，溫柔的微笑" },
   { category: 'work', text: "準時下班", mood: "以跑百米的速度奔跑，表情興奮" },
@@ -88,7 +86,6 @@ const MEME_DATABASE = [
   { category: 'work', text: "您說的是", mood: "點頭如搗蒜" },
   { category: 'work', text: "咖啡續命", mood: "打著點滴，裡面是黑咖啡" },
   { category: 'work', text: "禮拜五了", mood: "雙手舉高歡呼，背景放煙火" },
-  // 2. 學生
   { category: 'student', text: "歐趴", mood: "拿著考卷寫100分，表情得意" },
   { category: 'student', text: "被當", mood: "被巨大的F字母壓在地上" },
   { category: 'student', text: "點名沒", mood: "驚慌失措地從後門探頭" },
@@ -119,7 +116,6 @@ const MEME_DATABASE = [
   { category: 'student', text: "社團活動", mood: "拿著吉他或球具" },
   { category: 'student', text: "期中地獄", mood: "周圍都是火海" },
   { category: 'student', text: "期末解脫", mood: "張開雙臂飛向天空" },
-  // 3. 喇賽
   { category: 'nonsense', text: "笑死", mood: "誇張大笑，笑到流淚" },
   { category: 'nonsense', text: "歸剛欸", mood: "憤怒大喊，背景紅色震動" },
   { category: 'nonsense', text: "確實", mood: "摸下巴點頭，一臉高深" },
@@ -150,7 +146,6 @@ const MEME_DATABASE = [
   { category: 'nonsense', text: "這畫面太美", mood: "遮眼睛從指縫偷看" },
   { category: 'nonsense', text: "Duck不必", mood: "鴨子比叉叉" },
   { category: 'nonsense', text: "咩噗", mood: "一臉委屈快哭" },
-  // 4. 正式
   { category: 'formal', text: "早安", mood: "陽光下揮手微笑" },
   { category: 'formal', text: "晚安", mood: "蓋被子睡覺，旁邊有月亮" },
   { category: 'formal', text: "謝謝", mood: "雙手合十，微微鞠躬" },
@@ -181,7 +176,6 @@ const MEME_DATABASE = [
   { category: 'formal', text: "一路順風", mood: "對著飛機揮手" },
   { category: 'formal', text: "多謝款待", mood: "摸著肚子，一臉滿足" },
   { category: 'formal', text: "合作愉快", mood: "握手" },
-  // 5. 戀愛
   { category: 'love', text: "想你", mood: "托腮看著窗外，周圍有愛心" },
   { category: 'love', text: "愛你", mood: "雙手比愛心，眼睛也是愛心" },
   { category: 'love', text: "抱抱", mood: "張開雙臂求擁抱" },
@@ -241,7 +235,7 @@ const App = () => {
   const [videoStream, setVideoStream] = useState(null);
   
   // !!! 請填入您的 API Key !!!
-  const apiKey = "AIzaSyCDDMlPs4rs8Yviya6PsXkV6OcBu8K4QC4"; 
+  const apiKey = ""; 
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
@@ -249,10 +243,11 @@ const App = () => {
 
   // --- Auth Effect ---
   useEffect(() => {
-    if (!auth) return; // 如果沒有 Firebase Config，跳過 Auth
+    // 如果沒有 auth 實例 (例如本地沒填 config)，就直接跳過
+    if (!auth) return;
 
     const initAuth = async () => {
-      // 檢查是否為 Canvas 環境的預設 Token (本地端通常沒有)
+      // 檢查是否在 Canvas 環境或是本地有 config
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         await signInWithCustomToken(auth, __initial_auth_token);
       } else {
@@ -279,7 +274,7 @@ const App = () => {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Google login failed", error);
-      alert("登入失敗，請確認 Firebase Auth 設定");
+      alert("登入失敗，請確認 Firebase 設定");
     }
   };
 
@@ -331,12 +326,12 @@ const App = () => {
     try {
       setIsCameraOpen(true);
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "user" } // 優先使用前鏡頭
+        video: { facingMode: "user" }
       });
       setVideoStream(stream);
     } catch (err) {
       console.error("Camera access error:", err);
-      alert("無法開啟相機，請確認您已允許相機權限。");
+      alert("無法開啟相機，請確認您已允許相機權限，且使用 HTTPS 或 Localhost 環境。");
       setIsCameraOpen(false);
     }
   };
@@ -349,7 +344,6 @@ const App = () => {
     setIsCameraOpen(false);
   };
 
-  // 當 videoStream 更新時，將其綁定到 videoRef
   useEffect(() => {
     if (videoRef.current && videoStream) {
       videoRef.current.srcObject = videoStream;
@@ -362,19 +356,16 @@ const App = () => {
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
 
-      // 設定畫布大小與影片一致
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // 繪製當前影格 (水平翻轉/鏡像)
+      // 鏡像翻轉
       context.translate(canvas.width, 0);
       context.scale(-1, 1);
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // 轉為 Data URL
       const imageUrl = canvas.toDataURL('image/jpeg', 0.9);
       
-      // 關閉相機並進入下一步
       stopCamera();
       setSourceImage(imageUrl);
       setStep(2);
@@ -537,30 +528,30 @@ const App = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans flex flex-col selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-slate-950 text-white font-sans flex flex-col selection:bg-indigo-500/30">
       
       {/* Header */}
-      <header className="px-5 h-16 flex items-center justify-between border-b border-white/5 bg-slate-900/50 backdrop-blur-xl sticky top-0 z-40">
+      <header className="px-5 h-16 flex items-center justify-between border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="flex items-center gap-2">
           {step > 1 && !isGenerating && (
             <button onClick={() => setStep(1)} className="p-1 -ml-1 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft /></button>
           )}
           <h1 className="text-xl font-black italic tracking-tighter bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
-            STK-AI <span className="text-[10px] not-italic font-normal text-slate-500 border border-slate-700 px-1.5 rounded">PRO</span>
+            STK-AI <span className="text-[10px] not-italic font-normal text-slate-400 border border-slate-600 px-1.5 rounded">PRO</span>
           </h1>
         </div>
         
         {/* User Profile / Login */}
         <div className="flex items-center gap-3">
           {user && !user.isAnonymous ? (
-            <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-full border border-white/5">
+            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
               <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.email}`} alt="Avatar" className="w-6 h-6 rounded-full" />
-              <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-white transition-colors">
+              <button onClick={handleLogout} className="text-xs text-slate-300 hover:text-white transition-colors">
                 <LogOut size={14} />
               </button>
             </div>
           ) : (
-            <button onClick={handleGoogleLogin} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full transition-all">
+            <button onClick={handleGoogleLogin} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-full transition-all">
               <LogIn size={14} /> 登入
             </button>
           )}
@@ -575,7 +566,7 @@ const App = () => {
 
       <main className="flex-1 p-5 overflow-y-auto w-full max-w-2xl mx-auto">
         {status && (
-          <div className="mb-6 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-center text-xs font-bold text-indigo-400 animate-pulse flex items-center justify-center gap-2">
+          <div className="mb-6 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl text-center text-xs font-bold text-indigo-300 animate-pulse flex items-center justify-center gap-2">
             <RefreshCw size={14} className="animate-spin"/> {status}
           </div>
         )}
@@ -590,7 +581,7 @@ const App = () => {
                  {/* 1. Upload File */}
                  <div 
                     onClick={() => fileInputRef.current.click()}
-                    className="relative group cursor-pointer w-full aspect-square rounded-[3rem] bg-slate-900 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-5 hover:border-indigo-500 hover:bg-slate-800/50 transition-all active:scale-95 shadow-2xl overflow-hidden"
+                    className="relative group cursor-pointer w-full aspect-square rounded-[3rem] bg-slate-900 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center gap-5 hover:border-indigo-500 hover:bg-slate-800/50 transition-all active:scale-95 shadow-2xl overflow-hidden"
                  >
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity"/>
                     <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl flex items-center justify-center shadow-2xl ring-4 ring-slate-900 group-hover:scale-110 transition-transform duration-300 relative z-10">
@@ -605,7 +596,7 @@ const App = () => {
                  {/* 2. Open Camera Button */}
                  <button 
                     onClick={startCamera}
-                    className="w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-white/5 flex items-center justify-center gap-3 text-slate-300 font-bold transition-all active:scale-95"
+                    className="w-full py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 flex items-center justify-center gap-3 text-white font-bold transition-all active:scale-95 shadow-lg"
                  >
                     <Camera size={20} /> 開啟相機自拍
                  </button>
@@ -614,13 +605,13 @@ const App = () => {
              </div>
              
              <div className="grid grid-cols-2 gap-3 w-full max-w-xs">
-                <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/5 border border-white/5">
+                <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-slate-900 border border-slate-800">
                    <Grid size={20} className="text-indigo-400"/>
-                   <span className="text-xs font-bold text-slate-400">150+ 分類語錄</span>
+                   <span className="text-xs font-bold text-slate-300">150+ 分類語錄</span>
                 </div>
-                <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/5 border border-white/5">
+                <div className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-slate-900 border border-slate-800">
                    <Type size={20} className="text-purple-400"/>
-                   <span className="text-xs font-bold text-slate-400">9 格自訂填空</span>
+                   <span className="text-xs font-bold text-slate-300">9 格自訂填空</span>
                 </div>
              </div>
           </div>
@@ -631,19 +622,19 @@ const App = () => {
           <div className="space-y-8 animate-in slide-in-from-right duration-400 pb-20">
             {/* Image Preview */}
             <div className="flex justify-center">
-               <div className="w-32 h-32 rounded-[2rem] overflow-hidden ring-4 ring-white/10 shadow-2xl relative group">
+               <div className="w-32 h-32 rounded-[2rem] overflow-hidden ring-4 ring-slate-700 shadow-2xl relative group bg-black">
                  <img src={sourceImage} className="w-full h-full object-cover" alt="Preview" />
                  <button 
                   onClick={() => setStep(1)}
-                  className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm cursor-pointer"
+                  className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm cursor-pointer"
                  >
-                   <span className="text-xs font-bold text-white">重拍/重選</span>
+                   <span className="text-xs font-bold text-white border border-white/30 px-3 py-1 rounded-full">重拍/重選</span>
                  </button>
                </div>
             </div>
 
             {/* Category Selection */}
-            <section className="bg-white/5 rounded-3xl p-5 border border-white/5 space-y-4">
+            <section className="bg-slate-900 rounded-3xl p-5 border border-slate-800 space-y-4 shadow-xl">
                <div className="flex items-center justify-between">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                    <Grid size={14} /> 語錄主題
@@ -652,7 +643,7 @@ const App = () => {
                <div className="grid grid-cols-3 gap-2">
                  <button 
                     onClick={() => setSelectedCategory('all')}
-                    className={`p-2 rounded-xl text-xs font-bold border transition-all ${selectedCategory === 'all' ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-slate-900 text-slate-400 border-white/10 hover:bg-slate-800'}`}
+                    className={`p-2 rounded-xl text-xs font-bold border transition-all ${selectedCategory === 'all' ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}
                  >
                     全部混搭
                  </button>
@@ -660,7 +651,7 @@ const App = () => {
                     <button 
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedCategory === cat.id ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-slate-900 text-slate-400 border-white/10 hover:bg-slate-800'}`}
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all flex flex-col items-center gap-1 ${selectedCategory === cat.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}
                     >
                        <cat.icon size={14} />
                        {cat.name}
@@ -670,17 +661,17 @@ const App = () => {
             </section>
 
             {/* Custom Text Grid */}
-            <section className="bg-white/5 rounded-3xl p-5 border border-white/5 space-y-4">
+            <section className="bg-slate-900 rounded-3xl p-5 border border-slate-800 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                    <Type size={14} /> 貼圖文字 (9格)
                  </label>
                  <div className="flex gap-2">
-                     <button onClick={fillRandomToGrid} className="text-[10px] px-2 py-1 bg-white/10 rounded hover:bg-white/20 text-slate-300 flex items-center gap-1 transition-colors">
+                     <button onClick={fillRandomToGrid} className="text-[10px] px-2 py-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-300 flex items-center gap-1 transition-colors border border-slate-700">
                         <Wand2 size={10}/> 填滿
                      </button>
                      {customTexts.some(t => t) && (
-                        <button onClick={clearCustomTexts} className="text-[10px] px-2 py-1 bg-red-500/10 rounded hover:bg-red-500/20 text-red-400 flex items-center gap-1 transition-colors">
+                        <button onClick={clearCustomTexts} className="text-[10px] px-2 py-1 bg-red-500/10 rounded hover:bg-red-500/20 text-red-400 flex items-center gap-1 transition-colors border border-red-500/20">
                             <Eraser size={10}/> 清空
                         </button>
                      )}
@@ -696,7 +687,7 @@ const App = () => {
                       onChange={(e) => handleCustomTextChange(index, e.target.value)}
                       placeholder={`#${index + 1}`}
                       maxLength={8}
-                      className="w-full bg-slate-950/50 border border-white/10 rounded-xl px-2 py-3 text-sm font-bold text-white placeholder:text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-center"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-xl px-2 py-3 text-sm font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-center"
                     />
                 ))}
               </div>
@@ -713,7 +704,7 @@ const App = () => {
                   <button 
                     key={s.id}
                     onClick={() => setSelectedStyle(s)}
-                    className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition-all group relative overflow-hidden ${selectedStyle.id === s.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-white/5 bg-white/5 hover:bg-white/10'}`}
+                    className={`p-4 rounded-2xl border-2 flex items-center gap-4 transition-all group relative overflow-hidden ${selectedStyle.id === s.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-800 bg-slate-900 hover:bg-slate-800'}`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${selectedStyle.id === s.id ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
                       <Sparkles size={18} />
@@ -738,7 +729,7 @@ const App = () => {
                 {s.loading ? (
                   <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center gap-2 p-2 text-center">
                     <RefreshCw size={24} className="animate-spin text-indigo-500" />
-                    <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Generating</span>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Generating</span>
                   </div>
                 ) : s.url ? (
                   <div className="relative h-full w-full animate-in zoom-in duration-400 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
@@ -792,7 +783,7 @@ const App = () => {
       )}
 
       {/* Footer */}
-      <footer className="p-5 bg-slate-900/90 backdrop-blur-2xl border-t border-white/5 fixed bottom-0 w-full z-40">
+      <footer className="p-5 bg-slate-900/90 backdrop-blur-2xl border-t border-slate-800 fixed bottom-0 w-full z-40">
          <div className="max-w-2xl mx-auto">
             {step === 2 && (
             <button 
@@ -808,7 +799,7 @@ const App = () => {
                 <button 
                     disabled={isGenerating}
                     onClick={() => { setStep(2); setStickers([]); setStatus(''); }}
-                    className="flex-1 bg-slate-800 text-slate-300 h-14 rounded-2xl font-bold border border-white/5 active:bg-slate-700 transition-all disabled:opacity-50"
+                    className="flex-1 bg-slate-800 text-slate-300 h-14 rounded-2xl font-bold border border-slate-700 active:bg-slate-700 transition-all disabled:opacity-50"
                 >
                     {isGenerating ? '繪製中...' : '返回重設'}
                 </button>
@@ -833,6 +824,5 @@ const App = () => {
     </div>
   );
 };
-
 
 export default App;
