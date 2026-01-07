@@ -235,7 +235,7 @@ const App = () => {
   const [videoStream, setVideoStream] = useState(null);
   
   // !!! 請填入您的 API Key !!!
-  const apiKey = ""; 
+  const apiKey = "AIzaSyCDDMlPs4rs8Yviya6PsXkV6OcBu8K4QC4"; 
   
   const fileInputRef = useRef(null);
   const videoRef = useRef(null);
